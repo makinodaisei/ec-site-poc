@@ -74,6 +74,14 @@ export class ApiStack extends cdk.Stack {
       bundling,
     });
 
+    const canaryDemoLambda = new lambdaNodejs.NodejsFunction(this, 'CanaryDemoFunction', {
+      entry: path.join(srcDir, 'handlers/canary-demo.ts'),
+      handler: 'handler',
+      runtime,
+      environment: commonEnv,
+      bundling,
+    });
+
     // DynamoDB permissions
     tables.products.grantReadWriteData(productsLambda);
 
@@ -83,6 +91,8 @@ export class ApiStack extends cdk.Stack {
     tables.cartItems.grantReadWriteData(ordersLambda);
     tables.orders.grantReadWriteData(ordersLambda);
     tables.orderItems.grantReadWriteData(ordersLambda);
+
+    tables.canaryResults.grantReadWriteData(canaryDemoLambda);
 
     for (const table of Object.values(tables)) {
       table.grantReadData(adminLambda);
@@ -134,6 +144,13 @@ export class ApiStack extends cdk.Stack {
     const adminInteg = new apigateway.LambdaIntegration(adminLambda);
     adminTables.addMethod('GET', adminInteg);
     adminTableByName.addMethod('GET', adminInteg);
+
+    // /canary-demo
+    const canaryDemo = this.api.root.addResource('canary-demo');
+    const canaryDemoSub = canaryDemo.addResource('{sub}');
+    const canaryDemoInteg = new apigateway.LambdaIntegration(canaryDemoLambda);
+    canaryDemo.addMethod('GET', canaryDemoInteg);
+    canaryDemoSub.addMethod('POST', canaryDemoInteg);
 
     new cdk.CfnOutput(this, 'ApiUrl', {
       value: this.api.url,

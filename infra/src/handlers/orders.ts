@@ -31,6 +31,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     if (cartItems.length === 0) return error('Cart is empty', 400);
 
     const order = await orderRepo.create(user_id, cartItems, shipping_address ?? '');
+    await cartRepo.clear(user_id, cartItems);
     return created(order);
   }
 

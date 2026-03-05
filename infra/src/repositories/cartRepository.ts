@@ -30,3 +30,11 @@ export async function add(user_id: string, product_id: string, quantity: number)
 export async function remove(user_id: string, product_id: string): Promise<void> {
   await db.send(new DeleteCommand({ TableName: table, Key: { user_id, product_id } }));
 }
+
+export async function clear(user_id: string, items: CartItem[]): Promise<void> {
+  await Promise.all(
+    items.map((item) =>
+      db.send(new DeleteCommand({ TableName: table, Key: { user_id, product_id: item.product_id } }))
+    )
+  );
+}
