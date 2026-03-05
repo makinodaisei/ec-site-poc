@@ -7,6 +7,7 @@ interface Product {
   description: string;
   price: number;
   stock: number;
+  category?: string;
 }
 
 interface CartItem {
@@ -17,18 +18,40 @@ interface CartItem {
 
 const USER_ID = 'user-demo-1';
 
-export default function Shop() {
+function categoryClass(cat?: string) {
+  if (cat === 'electronics') return 'cat-electronics';
+  if (cat === 'accessories') return 'cat-accessories';
+  return 'cat-default';
+}
+
+function categoryLabel(cat?: string) {
+  if (cat === 'electronics') return '電子機器';
+  if (cat === 'accessories') return 'アクセサリー';
+  return cat ?? 'その他';
+}
+
+interface Props {
+  onCartCountChange: (n: number) => void;
+}
+
+export default function Shop({ onCartCountChange }: Props) {
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [msg, setMsg] = useState('');
   const [isErr, setIsErr] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const fetchCart = () =>
-    get<CartItem[]>(`/cart?user_id=${USER_ID}`).then(setCart).catch(console.error);
+  const fetchCart = async () => {
+    const items = await get<CartItem[]>(`/cart?user_id=${USER_ID}`).catch(() => [] as CartItem[]);
+    setCart(items);
+    onCartCountChange(items.length);
+  };
 
   useEffect(() => {
-    get<Product[]>('/products').then(setProducts).catch(console.error);
-    fetchCart();
+    Promise.all([
+      get<Product[]>('/products').then(setProducts).catch(console.error),
+      fetchCart(),
+    ]).finally(() => setLoading(false));
   }, []);
 
   async function addToCart(product_id: string) {
@@ -44,7 +67,7 @@ export default function Shop() {
   async function placeOrder() {
     try {
       await post('/orders', { user_id: USER_ID, shipping_address: '東京都渋谷区1-1-1' });
-      setMsg('注文が完了しました！');
+      setMsg('注文が完了しました！ご購入ありがとうございます。');
       setIsErr(false);
       await fetchCart();
     } catch (e) {
@@ -54,42 +77,86 @@ export default function Shop() {
   }
 
   const cartIds = new Set(cart.map((c) => c.product_id));
+  const cartTotal = cart.reduce((sum, c) => {
+    const p = products.find((p) => p.product_id === c.product_id);
+    return sum + (p ? p.price * c.quantity : 0);
+  }, 0);
+
+  if (loading) return <p className="loading">読み込み中...</p>;
 
   return (
-    <div>
-      <h2>商品一覧</h2>
-      {products.length === 0 && <p style={{ color: '#888' }}>商品がありません（Seed data を実行してください）</p>}
-      <div className="cards">
-        {products.map((p) => (
-          <div key={p.product_id} className="card">
-            <strong>{p.name}</strong>
-            <p style={{ fontSize: 12, color: '#555', margin: '6px 0' }}>{p.description}</p>
-            <p style={{ margin: '4px 0' }}>¥{p.price.toLocaleString()}</p>
-            <p style={{ fontSize: 12, color: '#888', margin: '4px 0' }}>在庫: {p.stock}</p>
-            {cartIds.has(p.product_id) ? (
-              <button className="small" onClick={() => removeFromCart(p.product_id)}>カートから削除</button>
-            ) : (
-              <button className="small" onClick={() => addToCart(p.product_id)}>カートに追加</button>
-            )}
-          </div>
-        ))}
-      </div>
+    <>
+      <section>
+        <h2>商品一覧</h2>
+        {products.length === 0 && (
+          <p className="muted">商品がありません（Seed data を実行してください）</p>
+        )}
+        <div className="cards">
+          {products.map((p) => (
+            <div key={p.product_id} className="card">
+              <span className={`card-category ${categoryClass(p.category)}`}>
+                {categoryLabel(p.category)}
+              </span>
+              <p className="card-name">{p.name}</p>
+              <p className="card-desc">{p.description}</p>
+              <p className="card-price">¥{p.price.toLocaleString()}</p>
+              <p className="card-stock">在庫 {p.stock} 点</p>
+              {cartIds.has(p.product_id) ? (
+                <>
+                  <p className="in-cart">✓ カートに追加済み</p>
+                  <button className="small danger" onClick={() => removeFromCart(p.product_id)}>
+                    削除
+                  </button>
+                </>
+              ) : (
+                <button
+                  className="small"
+                  onClick={() => addToCart(p.product_id)}
+                  disabled={p.stock === 0}
+                >
+                  {p.stock === 0 ? '在庫なし' : 'カートに追加'}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
 
-      <h2 style={{ marginTop: 32 }}>カート ({cart.length}点)</h2>
-      {cart.length === 0 && <p style={{ color: '#888' }}>カートは空です</p>}
-      {cart.length > 0 && (
-        <>
-          <ul>
-            {cart.map((c) => (
-              <li key={c.product_id}>
-                {products.find((p) => p.product_id === c.product_id)?.name ?? c.product_id} × {c.quantity}
-              </li>
-            ))}
-          </ul>
-          <button className="primary" onClick={placeOrder}>注文する</button>
-        </>
-      )}
-      {msg && <p className={`msg ${isErr ? 'err' : ''}`}>{msg}</p>}
-    </div>
+      <section>
+        <h2>カート ({cart.length} 点)</h2>
+        {cart.length === 0 ? (
+          <p className="muted">カートは空です</p>
+        ) : (
+          <div className="cart-box">
+            {cart.map((c) => {
+              const p = products.find((pr) => pr.product_id === c.product_id);
+              return (
+                <div key={c.product_id} className="cart-item">
+                  <span className="cart-item-name">{p?.name ?? c.product_id}</span>
+                  <div className="cart-item-right">
+                    <span className="cart-item-price">
+                      ¥{p ? (p.price * c.quantity).toLocaleString() : '—'}
+                    </span>
+                    <button className="small danger" onClick={() => removeFromCart(c.product_id)}>
+                      削除
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+            <div className="cart-total">
+              <span className="cart-total-label">合計</span>
+              <span className="cart-total-price">¥{cartTotal.toLocaleString()}</span>
+            </div>
+            <div style={{ marginTop: 20, textAlign: 'right' }}>
+              <button className="primary" onClick={placeOrder}>
+                注文する
+              </button>
+            </div>
+          </div>
+        )}
+        {msg && <p className={`msg ${isErr ? 'err' : ''}`}>{msg}</p>}
+      </section>
+    </>
   );
 }
