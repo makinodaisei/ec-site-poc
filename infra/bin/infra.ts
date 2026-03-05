@@ -5,6 +5,7 @@ import { DatabaseStack } from '../lib/database-stack';
 import { StorageStack } from '../lib/storage-stack';
 import { BudgetStack } from '../lib/budget-stack';
 import { ApiStack } from '../lib/api-stack';
+import { MonitoringStack } from '../lib/monitoring-stack';
 
 const app = new cdk.App();
 
@@ -19,7 +20,7 @@ const db = new DatabaseStack(app, 'EcSiteDatabase', { env });
 
 new StorageStack(app, 'EcSiteStorage', { env });
 
-new ApiStack(app, 'EcSiteApi', {
+const api = new ApiStack(app, 'EcSiteApi', {
   env,
   tables: {
     products: db.productsTable,
@@ -32,3 +33,10 @@ new ApiStack(app, 'EcSiteApi', {
 });
 
 new BudgetStack(app, 'EcSiteBudget', { env });
+
+new MonitoringStack(app, 'EcSiteMonitoring', {
+  env,
+  canaryResultsTable: db.canaryResultsTable,
+  apiUrl: api.api.url,
+  alertEmail: 'makinodaisei6345@gmail.com',
+});
