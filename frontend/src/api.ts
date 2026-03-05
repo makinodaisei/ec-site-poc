@@ -39,3 +39,17 @@ export async function patch<T>(path: string, body: unknown): Promise<T> {
 export async function del(path: string): Promise<void> {
   await fetch(`${BASE}${path}`, { method: 'DELETE' });
 }
+
+export async function getUploadUrl(productId: string): Promise<string> {
+  const res = await post<{ uploadUrl: string }>(`/products/${productId}/upload-url`, {});
+  return res.uploadUrl;
+}
+
+export async function uploadImageToS3(uploadUrl: string, file: File): Promise<void> {
+  const res = await fetch(uploadUrl, {
+    method: 'PUT',
+    body: file,
+    headers: { 'Content-Type': file.type || 'image/jpeg' },
+  });
+  if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+}

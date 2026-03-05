@@ -7,4 +7,5 @@ export const config = {
     cartItems: process.env.CART_ITEMS_TABLE ?? 'cart_items',
     canaryResults: process.env.CANARY_RESULTS_TABLE ?? 'canary_results',
   },
+  assetsBucket: process.env.ASSETS_BUCKET ?? '',
 };

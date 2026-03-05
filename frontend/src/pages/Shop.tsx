@@ -8,6 +8,7 @@ interface Product {
   price: number;
   stock: number;
   category?: string;
+  image_url?: string;
 }
 
 interface CartItem {
@@ -167,6 +168,10 @@ export default function Shop({ onCartCountChange }: Props) {
             onClick={(e) => e.stopPropagation()}
           >
             <button onClick={() => setDetailProduct(null)} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#888' }}>✕</button>
+            {detailProduct.image_url && (
+              <img src={detailProduct.image_url} alt={detailProduct.name}
+                style={{ width: '100%', height: 200, objectFit: 'cover', borderRadius: 8, marginBottom: 12 }} />
+            )}
             <span className={`card-category ${categoryClass(detailProduct.category)}`}>
               {CATEGORY_LABELS[detailProduct.category ?? ''] ?? detailProduct.category}
             </span>
@@ -230,6 +235,10 @@ export default function Shop({ onCartCountChange }: Props) {
         <div className="cards">
           {filteredProducts.map((p) => (
             <div key={p.product_id} className="card" onClick={() => setDetailProduct(p)} style={{ cursor: 'pointer' }}>
+              {p.image_url && (
+                <img src={p.image_url} alt={p.name}
+                  style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 8, marginBottom: 8 }} />
+              )}
               <span className={`card-category ${categoryClass(p.category)}`}>
                 {CATEGORY_LABELS[p.category ?? ''] ?? p.category}
               </span>

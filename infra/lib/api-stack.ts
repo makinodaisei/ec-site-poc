@@ -3,6 +3,8 @@ import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs';
+import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import { Construct } from 'constructs';
 import * as path from 'path';
@@ -16,6 +18,7 @@ interface ApiStackProps extends cdk.StackProps {
     cartItems: dynamodb.Table;
     canaryResults: dynamodb.Table;
   };
+  assetsBucketName: string;
 }
 
 export class ApiStack extends cdk.Stack {
@@ -27,6 +30,9 @@ export class ApiStack extends cdk.Stack {
     const { tables } = props;
     const srcDir = path.join(__dirname, '../src');
 
+    // Import assets bucket by name (avoids circular stack dependency)
+    const assetsBucket = s3.Bucket.fromBucketName(this, 'AssetsBucket', props.assetsBucketName);
+
     const commonEnv = {
       PRODUCTS_TABLE: tables.products.tableName,
       USERS_TABLE: tables.users.tableName,
@@ -34,6 +40,7 @@ export class ApiStack extends cdk.Stack {
       ORDER_ITEMS_TABLE: tables.orderItems.tableName,
       CART_ITEMS_TABLE: tables.cartItems.tableName,
       CANARY_RESULTS_TABLE: tables.canaryResults.tableName,
+      ASSETS_BUCKET: props.assetsBucketName,
     };
 
     const bundling = {
@@ -82,6 +89,16 @@ export class ApiStack extends cdk.Stack {
       bundling,
     });
 
+    // Thumbnail Lambda — triggered by S3 on tmp-uploads/products/*
+    const thumbnailLambda = new lambdaNodejs.NodejsFunction(this, 'ThumbnailFunction', {
+      entry: path.join(srcDir, 'handlers/thumbnail.ts'),
+      handler: 'handler',
+      runtime,
+      environment: commonEnv,
+      bundling,
+      timeout: cdk.Duration.seconds(30),
+    });
+
     // DynamoDB permissions
     tables.products.grantReadWriteData(productsLambda);
 
@@ -104,6 +121,44 @@ export class ApiStack extends cdk.Stack {
       })
     );
 
+    tables.products.grantWriteData(thumbnailLambda);
+
+    // S3 permissions
+    // Products Lambda: generate presigned PUT (for upload-url) + sign GET (for image display)
+    productsLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['s3:PutObject'],
+        resources: [`arn:aws:s3:::${props.assetsBucketName}/tmp-uploads/products/*`],
+      })
+    );
+    productsLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['s3:GetObject'],
+        resources: [`arn:aws:s3:::${props.assetsBucketName}/products/images/*`],
+      })
+    );
+
+    // Thumbnail Lambda: read tmp-uploads, write products/images
+    thumbnailLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['s3:GetObject'],
+        resources: [`arn:aws:s3:::${props.assetsBucketName}/tmp-uploads/*`],
+      })
+    );
+    thumbnailLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['s3:PutObject'],
+        resources: [`arn:aws:s3:::${props.assetsBucketName}/products/images/*`],
+      })
+    );
+
+    // S3 event notification: tmp-uploads/products/* → thumbnailLambda
+    assetsBucket.addEventNotification(
+      s3.EventType.OBJECT_CREATED,
+      new s3n.LambdaDestination(thumbnailLambda),
+      { prefix: 'tmp-uploads/products/' }
+    );
+
     // API Gateway
     this.api = new apigateway.RestApi(this, 'EcSiteApi', {
       restApiName: 'ec-site-poc-api',
@@ -116,10 +171,12 @@ export class ApiStack extends cdk.Stack {
     // /products
     const products = this.api.root.addResource('products');
     const productById = products.addResource('{id}');
+    const productUploadUrl = productById.addResource('upload-url');
     const productsInteg = new apigateway.LambdaIntegration(productsLambda);
     products.addMethod('GET', productsInteg);
     products.addMethod('POST', productsInteg);
     productById.addMethod('GET', productsInteg);
+    productUploadUrl.addMethod('POST', productsInteg);
 
     // /cart
     const cart = this.api.root.addResource('cart');

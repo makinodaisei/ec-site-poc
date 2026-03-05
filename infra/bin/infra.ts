@@ -18,10 +18,11 @@ new NetworkStack(app, 'EcSiteNetwork', { env });
 
 const db = new DatabaseStack(app, 'EcSiteDatabase', { env });
 
-new StorageStack(app, 'EcSiteStorage', { env });
+const storage = new StorageStack(app, 'EcSiteStorage', { env });
 
 const api = new ApiStack(app, 'EcSiteApi', {
   env,
+  assetsBucketName: storage.assetsBucket.bucketName,
   tables: {
     products: db.productsTable,
     users: db.usersTable,

@@ -33,6 +33,17 @@ export async function create(data: Partial<Product>): Promise<Product> {
   return product;
 }
 
+export async function updateImageUrl(product_id: string, image_key: string): Promise<void> {
+  await db.send(
+    new UpdateCommand({
+      TableName: table,
+      Key: { product_id },
+      UpdateExpression: 'SET image_url = :key, updated_at = :now',
+      ExpressionAttributeValues: { ':key': image_key, ':now': new Date().toISOString() },
+    })
+  );
+}
+
 export async function decreaseStock(product_id: string, quantity: number): Promise<void> {
   await db.send(
     new UpdateCommand({

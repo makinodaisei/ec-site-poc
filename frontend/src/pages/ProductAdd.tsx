@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { post } from '../api';
+import { post, getUploadUrl, uploadImageToS3 } from '../api';
 
 const CATEGORIES = ['electronics', 'accessories', 'clothing', 'food', 'books', 'other'];
 
@@ -11,6 +11,7 @@ export default function ProductAdd() {
     stock: '',
     category: 'electronics',
   });
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [msg, setMsg] = useState('');
   const [isErr, setIsErr] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -30,6 +31,7 @@ export default function ProductAdd() {
     setLoading(true);
     setMsg('');
     try {
+      // 1. Create product
       const product = await post<{ product_id: string; name: string }>('/products', {
         name: form.name.trim(),
         description: form.description.trim(),
@@ -38,9 +40,19 @@ export default function ProductAdd() {
         category: form.category,
         image_url: '',
       });
-      setMsg(`商品「${product.name}」を登録しました (ID: ${product.product_id})`);
+
+      // 2. Upload image if selected
+      if (imageFile) {
+        setMsg('画像をアップロード中...');
+        const uploadUrl = await getUploadUrl(product.product_id);
+        await uploadImageToS3(uploadUrl, imageFile);
+        setMsg('画像処理中（サムネイルLambdaが実行されます）...');
+      }
+
+      setMsg(`商品「${product.name}」を登録しました${imageFile ? '（画像は数秒後に反映）' : ''} (ID: ${product.product_id})`);
       setIsErr(false);
       setForm({ name: '', description: '', price: '', stock: '', category: 'electronics' });
+      setImageFile(null);
     } catch (e) {
       setMsg('登録失敗: ' + String(e));
       setIsErr(true);
@@ -112,6 +124,28 @@ export default function ProductAdd() {
             </select>
           </label>
 
+          <label style={labelStyle}>
+            商品画像（任意）
+            <div style={{ marginTop: 6 }}>
+              <input
+                type="file"
+                accept="image/*"
+                style={{ fontSize: 13, color: '#4a5568' }}
+                onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
+              />
+              {imageFile && (
+                <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <img
+                    src={URL.createObjectURL(imageFile)}
+                    alt="preview"
+                    style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid #e2e8f0' }}
+                  />
+                  <span style={{ fontSize: 12, color: '#718096' }}>{imageFile.name}</span>
+                </div>
+              )}
+            </div>
+          </label>
+
           <button
             type="submit"
             className="primary"
@@ -126,8 +160,8 @@ export default function ProductAdd() {
       </div>
 
       <div style={{ marginTop: 24, padding: 16, background: '#f7fafc', borderRadius: 8, fontSize: 13, color: '#718096', maxWidth: 480 }}>
-        <strong>補足:</strong> 登録した商品はショップページで即座に表示されます。<br />
-        API: <code style={{ background: '#e2e8f0', padding: '1px 6px', borderRadius: 4 }}>POST /products</code>
+        <strong>画像パイプライン:</strong> 画像選択 → S3 presigned URL取得 → S3直接アップロード → サムネイルLambda自動起動 → DynamoDB更新<br />
+        API: <code style={{ background: '#e2e8f0', padding: '1px 6px', borderRadius: 4 }}>POST /products/{'{id}'}/upload-url</code>
       </div>
     </>
   );
