@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EC Site PoC</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { font-family: sans-serif; margin: 0; padding: 0; background: #f9f9f9; }
+      nav { background: #222; padding: 12px 20px; display: flex; gap: 16px; }
+      nav button { background: none; border: none; color: #ccc; cursor: pointer; font-size: 15px; padding: 4px 8px; }
+      nav button:hover, nav button.active { color: white; border-bottom: 2px solid white; }
+      main { padding: 24px; max-width: 1100px; margin: 0 auto; }
+      button.primary { background: #0066cc; color: white; border: none; border-radius: 4px; padding: 8px 16px; cursor: pointer; }
+      button.primary:hover { background: #0052a3; }
+      button.small { background: #eee; border: 1px solid #ccc; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 12px; }
+      table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 12px; }
+      th, td { border: 1px solid #ddd; padding: 7px 12px; text-align: left; }
+      th { background: #f0f0f0; font-weight: 600; }
+      .green { color: #1a8c00; font-size: 20px; font-weight: bold; }
+      .red { color: #cc0000; font-size: 20px; font-weight: bold; }
+      .card { border: 1px solid #ddd; border-radius: 6px; padding: 14px; width: 200px; background: white; }
+      .cards { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; }
+      select { padding: 6px 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; }
+      .msg { margin-top: 12px; padding: 10px; border-radius: 4px; background: #e6f4ea; color: #1a5c2a; }
+      .err { background: #fde8e8; color: #8c1a1a; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

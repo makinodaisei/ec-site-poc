@@ -1,0 +1,75 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: infra/package-lock.json
+
+      - name: Install infra deps
+        run: npm ci
+        working-directory: infra
+
+      - name: CDK deploy
+        run: npx cdk deploy --all --require-approval never
+        working-directory: infra
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ap-northeast-1
+          CDK_DEFAULT_ACCOUNT: '674594306903'
+          CDK_DEFAULT_REGION: ap-northeast-1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend deps
+        run: npm ci
+        working-directory: frontend
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: frontend
+
+      - name: Deploy frontend to S3
+        working-directory: frontend
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ap-northeast-1
+        run: |
+          BUCKET=$(aws cloudformation describe-stacks \
+            --stack-name EcSiteStorage \
+            --query "Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue" \
+            --output text)
+
+          aws s3 cp dist/index.html s3://$BUCKET/index.html \
+            --content-type "text/html; charset=utf-8"
+
+          find dist/assets -name "*.js" | while read f; do
+            aws s3 cp "$f" "s3://$BUCKET/assets/$(basename $f)" \
+              --content-type "application/javascript"
+          done
+
+          find dist/assets -name "*.css" | while read f; do
+            aws s3 cp "$f" "s3://$BUCKET/assets/$(basename $f)" \
+              --content-type "text/css"
+          done
+
+          aws s3 sync dist/ s3://$BUCKET/ --delete \
+            --exclude "*.html" \
+            --exclude "assets/*.js" \
+            --exclude "assets/*.css"
