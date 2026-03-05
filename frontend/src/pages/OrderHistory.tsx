@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { get } from '../api';
+import { get, patch } from '../api';
 
 interface Order {
   order_id: string;
@@ -37,6 +37,7 @@ export default function OrderHistory() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [details, setDetails] = useState<Record<string, OrderDetail>>({});
   const [loading, setLoading] = useState(true);
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
 
   useEffect(() => {
     get<Order[]>(`/orders?user_id=${USER_ID}`)
@@ -44,6 +45,18 @@ export default function OrderHistory() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  async function updateStatus(order_id: string, status: string) {
+    setUpdatingStatus(order_id);
+    try {
+      await patch(`/orders/${order_id}`, { status });
+      setOrders((prev) => prev.map((o) => o.order_id === order_id ? { ...o, status } : o));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setUpdatingStatus(null);
+    }
+  }
 
   async function toggleDetail(order_id: string) {
     if (expanded === order_id) {
@@ -95,6 +108,18 @@ export default function OrderHistory() {
                   <div style={{ borderTop: '1px solid #f0f0f0', padding: '14px 20px', background: '#fafbfc' }}>
                     <div style={{ fontSize: 11, color: '#a0aec0', marginBottom: 8 }}>
                       注文ID: <code style={{ fontSize: 11 }}>{o.order_id}</code>
+                    </div>
+                    {/* Status control */}
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+                      {(['pending', 'paid', 'shipped', 'cancelled'] as const).map((s) => (
+                        <button key={s} className="small"
+                          disabled={o.status === s || updatingStatus === o.order_id}
+                          style={{ fontWeight: o.status === s ? 700 : 400, background: o.status === s ? '#e2e8f0' : undefined }}
+                          onClick={() => updateStatus(o.order_id, s)}
+                        >
+                          {STATUS_LABEL[s]?.label ?? s}
+                        </button>
+                      ))}
                     </div>
                     {!detail ? (
                       <p className="loading">読み込み中...</p>

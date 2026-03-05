@@ -1,4 +1,4 @@
-import { GetCommand, PutCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
+import { GetCommand, PutCommand, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { randomUUID } from 'crypto';
 import { db } from '../shared/db';
 import { config } from '../shared/config';
@@ -31,4 +31,16 @@ export async function create(data: Partial<Product>): Promise<Product> {
   };
   await db.send(new PutCommand({ TableName: table, Item: product }));
   return product;
+}
+
+export async function decreaseStock(product_id: string, quantity: number): Promise<void> {
+  await db.send(
+    new UpdateCommand({
+      TableName: table,
+      Key: { product_id },
+      UpdateExpression: 'SET stock = stock - :qty, updated_at = :now',
+      ConditionExpression: 'stock >= :qty',
+      ExpressionAttributeValues: { ':qty': quantity, ':now': new Date().toISOString() },
+    })
+  );
 }

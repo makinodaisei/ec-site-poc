@@ -22,6 +22,15 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     return created(item);
   }
 
+  if (method === 'PUT') {
+    const product_id = event.pathParameters?.product_id;
+    const body = JSON.parse(event.body ?? '{}');
+    const { user_id, quantity } = body;
+    if (!user_id || !product_id || !quantity) return error('user_id, product_id, quantity required', 400);
+    const item = await cartRepo.add(user_id, product_id, Number(quantity));
+    return ok(item);
+  }
+
   if (method === 'DELETE') {
     const product_id = event.pathParameters?.product_id;
     const user_id = event.queryStringParameters?.user_id;

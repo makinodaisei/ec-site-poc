@@ -1,7 +1,8 @@
-import { GetCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { randomUUID } from 'crypto';
 import { db } from '../shared/db';
 import { config } from '../shared/config';
+import { decreaseStock } from './productRepository';
 import type { CartItem, Order, OrderItem } from '../shared/types';
 
 export async function create(
@@ -46,8 +47,22 @@ export async function create(
   for (const item of orderItems) {
     await db.send(new PutCommand({ TableName: config.tables.orderItems, Item: item }));
   }
+  // Decrease stock for each ordered item (best-effort)
+  await Promise.allSettled(orderItems.map((item) => decreaseStock(item.product_id, item.quantity)));
 
   return order;
+}
+
+export async function updateStatus(order_id: string, status: string): Promise<void> {
+  await db.send(
+    new UpdateCommand({
+      TableName: config.tables.orders,
+      Key: { order_id },
+      UpdateExpression: 'SET #s = :status',
+      ExpressionAttributeNames: { '#s': 'status' },
+      ExpressionAttributeValues: { ':status': status },
+    })
+  );
 }
 
 export async function getById(

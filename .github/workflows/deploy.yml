@@ -20,8 +20,12 @@ jobs:
         run: npm ci
         working-directory: infra
 
+      - name: Build CDK (compile TS)
+        run: node --max-old-space-size=4096 node_modules/typescript/bin/tsc
+        working-directory: infra
+
       - name: CDK deploy
-        run: npx cdk deploy --all --require-approval never
+        run: NODE_OPTIONS="--max-old-space-size=4096" npx cdk deploy --all --require-approval never
         working-directory: infra
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}

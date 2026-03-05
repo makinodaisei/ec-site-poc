@@ -25,7 +25,7 @@ jobs:
         working-directory: infra
 
       - name: TypeScript check (infra)
-        run: npx tsc --noEmit
+        run: node --max-old-space-size=4096 node_modules/typescript/bin/tsc --noEmit
         working-directory: infra
 
       - name: Unit tests (infra)
@@ -46,8 +46,12 @@ jobs:
         run: npx tsc --noEmit
         working-directory: frontend
 
+      - name: Build CDK (compile TS)
+        run: node --max-old-space-size=4096 node_modules/typescript/bin/tsc
+        working-directory: infra
+
       - name: CDK diff
-        run: npx cdk diff --all
+        run: NODE_OPTIONS="--max-old-space-size=4096" npx cdk diff --all
         working-directory: infra
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}

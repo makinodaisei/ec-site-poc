@@ -35,5 +35,14 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     return created(order);
   }
 
+  if (method === 'PATCH' && orderId) {
+    const body = JSON.parse(event.body ?? '{}');
+    const { status } = body;
+    const allowed = ['pending', 'paid', 'shipped', 'cancelled'];
+    if (!allowed.includes(status)) return error(`status must be one of: ${allowed.join(', ')}`, 400);
+    await orderRepo.updateStatus(orderId, status);
+    return ok({ order_id: orderId, status });
+  }
+
   return error('Method not allowed', 405);
 };

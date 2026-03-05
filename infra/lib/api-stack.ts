@@ -87,7 +87,7 @@ export class ApiStack extends cdk.Stack {
 
     tables.cartItems.grantReadWriteData(cartLambda);
 
-    tables.products.grantReadData(ordersLambda);
+    tables.products.grantReadWriteData(ordersLambda);
     tables.cartItems.grantReadWriteData(ordersLambda);
     tables.orders.grantReadWriteData(ordersLambda);
     tables.orderItems.grantReadWriteData(ordersLambda);
@@ -128,6 +128,7 @@ export class ApiStack extends cdk.Stack {
     cart.addMethod('GET', cartInteg);
     cart.addMethod('POST', cartInteg);
     cartByProduct.addMethod('DELETE', cartInteg);
+    cartByProduct.addMethod('PUT', cartInteg);
 
     // /orders
     const orders = this.api.root.addResource('orders');
@@ -136,6 +137,7 @@ export class ApiStack extends cdk.Stack {
     orders.addMethod('GET', ordersInteg);
     orders.addMethod('POST', ordersInteg);
     orderById.addMethod('GET', ordersInteg);
+    orderById.addMethod('PATCH', ordersInteg);
 
     // /admin/tables
     const admin = this.api.root.addResource('admin');
